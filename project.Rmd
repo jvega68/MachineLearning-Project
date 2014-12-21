@@ -1,0 +1,83 @@
+---
+title: "Machine Learning Project"
+author: "Jorge de la Vega"
+date: "21/12/2014"
+output: html_document
+---
+
+##Introduction
+This document describes the analysis made to find a prediction model for the data on the way exercise is due using accelerometers. This data focus on how well they do the exercise. The goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+
+##Summary and Conclusions
+After making some adjustment to the dataset to get tidy data and reducing the set of variables from 159 to 50, I considered different algorithms for prediction, namely trees, random forests and boosting. Regression was not considered since does not seem to be a good approach for a response variable that is categorical.
+
+After running the three type of models, I conclude that the best prediction method is boosting with an out of sample estimate error of 1%. However, this is the method that takes more time to execute (even more than random forest were control options had to be adjusted in order that the algorithm concluded in a reasonable time).
+
+
+##Methodology
+The variables that were removed from the dataset were those variables that had NA's, mostly variables that are statistics (totals, means, variances, standard deviations, kurtosis and so on) from the original data. I decided to keep the participant as factor variable, since the results might be affected by proper characteristics of the subject.
+
+```{r}
+#Reading, cleaning and setting up
+library(plyr)
+library(caret)
+library(rattle)
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+
+#set of vars to keep
+vars <- c(2,8:10,37:48,60:68,84:86,113:124,151:159)
+training <- training[,c(vars,160)]
+testing <-testing[,vars]
+```
+
+The approach I am taking is to use 60% of the dataset training to build the model and 40% to compute the out of sample errors. The tesing dataset is use to get the final prediction to submit in the second part of the project.
+
+### Trees
+The first approach is to use the tree partition approach. In this case the accuracy of the model is low, 51%.
+
+```{r}
+inTrain <- createDataPartition(y = training$classe, p = 0.6, list=F)
+system.time(m1 <- train(classe ~ ., data = training[inTrain,], method = "rpart"))
+m1
+print(m1$finalModel)
+fancyRpartPlot(m1$finalModel) #print the classification tree
+```
+
+The out of sample error is computed using the rest of the training set, getting an estimate of out of sample error of 1- accuracy which is approximately 50%.
+
+```{r}
+pred1 <- predict(m1,newdata= training[-inTrain,])
+confusionMatrix(pred1,training[-inTrain,]$classe)
+```
+
+
+###Random forests
+In this second approach I use random forests to fit a prediction model. First we tune the parameters using the trainControl function, in order to reduce the execution time. With this method, we obtain an accuracy of 98.27% and one estimate of the out of sample error of 1%.
+
+```{r}
+control1 <- trainControl(method = "cv", number = 4) 
+system.time(m2 <- train(classe ~ ., data = training[inTrain,], method = "rf", trControl = control1, prox = F))
+m2
+print(m2$finalModel)
+#predict values
+pred2 <- predict(m2, newdata = training[-inTrain,])
+confusionMatrix(pred2,training[-inTrain,]$classe)
+```
+
+
+###Boosting
+With this third approach to the prediction problem, an accuracy of 95% is obtained and a out of sample error estimate of 1%.
+```{r}
+control1 <- trainControl(method = "cv", number = 4) 
+system.time(m3 <- train(classe ~ ., data = training[inTrain,], method = "gbm", trControl = control1, verbose = F))
+m3
+print(m3$finalModel)
+#predict values for out of sample error
+pred3 <- predict(m3, newdata = training[-inTrain,])
+confusionMatrix(pred2,training[-inTrain,]$classe)
+```
+
+
+
